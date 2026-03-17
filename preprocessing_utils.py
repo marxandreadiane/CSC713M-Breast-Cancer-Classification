@@ -99,7 +99,8 @@ def augment_target_class(
     target_indices = np.where(y_train == target_label)[0]
     print(f"Augmenting {len(target_indices)} images from target class...")
 
-    active_transforms = transforms[:max(0, augmentation_factor)]
+    num_augs = max(0, int(augmentation_factor))
+    active_transforms = transforms if transforms else ["flip"]
 
     for idx in tqdm(target_indices):
         img = X_train[idx]
@@ -108,13 +109,17 @@ def augment_target_class(
         augmented_images.append(img)
         augmented_labels.append(y_train[idx])
 
-        for transform_name in active_transforms:
+        # Create exactly `augmentation_factor` augmented samples per target image.
+        for aug_idx in range(num_augs):
+            transform_name = active_transforms[aug_idx % len(active_transforms)]
             if transform_name == "flip":
                 transformed = cv2.flip(img_2d, 1)
             elif transform_name == "rotate":
                 h, w = img_2d.shape[:2]
                 center = (w // 2, h // 2)
-                rotation_matrix = cv2.getRotationMatrix2D(center, rotation_angle, 1.0)
+                # Alternate rotation direction to reduce duplicate rotated samples.
+                signed_angle = rotation_angle if aug_idx % 2 == 0 else -rotation_angle
+                rotation_matrix = cv2.getRotationMatrix2D(center, signed_angle, 1.0)
                 transformed = cv2.warpAffine(
                     img_2d,
                     rotation_matrix,
