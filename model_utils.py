@@ -59,12 +59,13 @@ def build_mobilenet_final(input_shape, num_classes):
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = GaussianNoise(0.1)(x)
+    x = GaussianNoise(0.10)(x)
     x = Dense(192, activation="relu", kernel_regularizer=l2(1e-4))(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.50)(x)
+    x = Dropout(0.55)(x)
     x = Dense(96, activation="relu", kernel_regularizer=l2(1e-4))(x)
-    x = Dropout(0.30)(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.40)(x)
     output_layer = Dense(num_classes, activation="softmax")(x)
     model = Model(inputs=base_model.input, outputs=output_layer)
     return base_model, model
