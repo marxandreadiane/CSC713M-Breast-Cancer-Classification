@@ -109,7 +109,6 @@ def augment_target_class(
         augmented_images.append(img)
         augmented_labels.append(y_train[idx])
 
-        # Create exactly `augmentation_factor` augmented samples per target image.
         for aug_idx in range(num_augs):
             transform_name = active_transforms[aug_idx % len(active_transforms)]
             if transform_name == "flip":
@@ -117,7 +116,6 @@ def augment_target_class(
             elif transform_name == "rotate":
                 h, w = img_2d.shape[:2]
                 center = (w // 2, h // 2)
-                # Alternate rotation direction to reduce duplicate rotated samples.
                 signed_angle = rotation_angle if aug_idx % 2 == 0 else -rotation_angle
                 rotation_matrix = cv2.getRotationMatrix2D(center, signed_angle, 1.0)
                 transformed = cv2.warpAffine(
@@ -154,11 +152,6 @@ def summarize_augmentation(X_train, X_train_augmented, y_train, y_train_augmente
     for label_idx, count in zip(unique_aug, counts_aug):
         label_name = label_encoder.classes_[label_idx]
         print(f"  {label_name}: {count} ({count / len(y_train_augmented) * 100:.2f}%)")
-
-    print("\nTarget class augmented successfully!")
-    print(f"  Before: {np.sum(y_train == target_label)} samples")
-    print(f"  After:  {np.sum(y_train_augmented == target_label)} samples")
-    print(f"{'=' * 60}")
 
 
 def flatten_images(X_train_augmented, X_val, X_test):

@@ -83,7 +83,6 @@ def build_resnet50_basic(input_shape, num_classes):
 
 
 def build_simple_cnn(input_shape=(128, 128, 1), num_classes=3, dropout_rate=0.3):
-    """Simple CNN trained from scratch (no transfer learning)."""
     model = Sequential(
         [
             Conv2D(32, (3, 3), activation="relu", padding="same", input_shape=input_shape),
