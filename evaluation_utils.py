@@ -2,7 +2,6 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from IPython.display import display
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     accuracy_score,
@@ -29,6 +28,8 @@ def evaluate_sklearn_classifier(
     print(f"TEST SET EVALUATION - {title}")
     print(f"{'=' * 60}\n")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%\n")
+    print("Per-class Metrics (Precision / Recall / F1-score / Support):")
+    print(report)
 
     fig, ax = plt.subplots(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
@@ -63,6 +64,8 @@ def evaluate_keras_classifier(
     print(f"{'=' * 60}")
     print(f"Test Loss: {loss:.4f}")
     print(f"Test Accuracy: {accuracy * 100:.2f}%")
+    print("\nPer-class Metrics (Precision / Recall / F1-score / Support):")
+    print(report)
 
     fig, ax = plt.subplots(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
@@ -107,7 +110,7 @@ def compare_model_accuracies(model_names, accuracies):
     print(f"\n{'=' * 60}")
     print("MODEL PERFORMANCE COMPARISON (Test Set)")
     print(f"{'=' * 60}")
-    display(comparison_df)
+    print(comparison_df.to_string(index=False))
     print(f"{'=' * 60}")
 
     plt.figure(figsize=(12, 7))
@@ -520,26 +523,99 @@ def plot_final_evaluation_dashboard_section(namespace=None):
         namespace = {}
 
     results_catalog = [
-        ("Random Forest", ["cm"], ["test_accuracy"]),
-        ("MobileNetV2 (Basic)", ["cm_mobilenet"], ["accuracy"]),
-        ("MobileNetV2 2.0", ["cm_improved_mobilenet", "cm_improved"], ["improved_accuracy"]),
-        ("MobileNetV2 3.0", ["cm_final_mobilenet", "cm_final"], ["final_accuracy"]),
-        ("ResNet50 (Basic)", ["cm_resnet"], ["resnet_accuracy"]),
-        ("ResNet50 2.0", ["cm_resnet_finetuned"], ["resnet_finetuned_accuracy"]),
+        ("Random Forest", ["cm"], ["test_accuracy"], ["y_test_pred"]),
+        ("MobileNetV2 (Basic)", ["cm_mobilenet"], ["accuracy"], ["y_pred_mobilenet"]),
+        (
+            "MobileNetV2 2.0",
+            ["cm_improved_mobilenet", "cm_improved"],
+            ["improved_accuracy"],
+            ["y_pred_improved_mobilenet"],
+        ),
+        (
+            "MobileNetV2 3.0",
+            ["cm_final_mobilenet", "cm_final"],
+            ["final_accuracy"],
+            ["y_pred_final_mobilenet"],
+        ),
+        ("ResNet50 (Basic)", ["cm_resnet"], ["resnet_accuracy"], ["y_pred_resnet"]),
+        (
+            "ResNet50 2.0",
+            ["cm_resnet_finetuned"],
+            ["resnet_finetuned_accuracy"],
+            ["y_pred_resnet_finetuned"],
+        ),
     ]
 
     available = []
-    for model_name, cm_vars, acc_vars in results_catalog:
+    for model_name, cm_vars, acc_vars, pred_vars in results_catalog:
         cm_value = next((namespace.get(var_name) for var_name in cm_vars if namespace.get(var_name) is not None), None)
         acc_value = next((namespace.get(var_name) for var_name in acc_vars if namespace.get(var_name) is not None), None)
+        y_pred = next((namespace.get(var_name) for var_name in pred_vars if namespace.get(var_name) is not None), None)
         if cm_value is not None and hasattr(cm_value, "shape") and np.array(cm_value).ndim == 2:
-            available.append((model_name, np.array(cm_value), acc_value))
+            available.append((model_name, np.array(cm_value), acc_value, y_pred))
 
     if not available:
         raise ValueError("No confusion matrices found. Run the model evaluation cells first, then rerun this cell.")
 
     label_encoder = namespace.get("label_encoder")
     label_names = list(label_encoder.classes_) if label_encoder is not None and hasattr(label_encoder, "classes_") else None
+    y_test = namespace.get("y_test")
+
+    metrics_rows = []
+    malignant_label = None
+    if label_names is not None and "malignant" in label_names:
+        malignant_label = label_names.index("malignant")
+
+    for model_name, cm_value, acc_value, y_pred in available:
+        row = {
+            "Model": model_name,
+            "Accuracy": np.nan,
+            "Macro Precision": np.nan,
+            "Macro Recall": np.nan,
+            "Macro F1": np.nan,
+            "Malignant Precision": np.nan,
+            "Malignant Recall": np.nan,
+            "Malignant F1": np.nan,
+        }
+
+        if y_test is not None and y_pred is not None:
+            y_true_arr = np.array(y_test)
+            y_pred_arr = np.array(y_pred)
+            if y_true_arr.shape[0] == y_pred_arr.shape[0]:
+                report_dict = classification_report(y_true_arr, y_pred_arr, output_dict=True, zero_division=0)
+                row["Accuracy"] = float(report_dict.get("accuracy", np.nan))
+                row["Macro Precision"] = float(report_dict.get("macro avg", {}).get("precision", np.nan))
+                row["Macro Recall"] = float(report_dict.get("macro avg", {}).get("recall", np.nan))
+                row["Macro F1"] = float(report_dict.get("macro avg", {}).get("f1-score", np.nan))
+
+                if malignant_label is not None:
+                    malignant_key = str(malignant_label)
+                    malignant_stats = report_dict.get(malignant_key, {})
+                    row["Malignant Precision"] = float(malignant_stats.get("precision", np.nan))
+                    row["Malignant Recall"] = float(malignant_stats.get("recall", np.nan))
+                    row["Malignant F1"] = float(malignant_stats.get("f1-score", np.nan))
+
+        if np.isnan(row["Accuracy"]) and acc_value is not None:
+            row["Accuracy"] = float(acc_value)
+
+        metrics_rows.append(row)
+
+    if metrics_rows:
+        metrics_df = pd.DataFrame(metrics_rows)
+        numeric_cols = [
+            "Accuracy",
+            "Macro Precision",
+            "Macro Recall",
+            "Macro F1",
+            "Malignant Precision",
+            "Malignant Recall",
+            "Malignant F1",
+        ]
+        for col in numeric_cols:
+            metrics_df[col] = metrics_df[col].map(lambda v: f"{v:.4f}" if pd.notna(v) else "N/A")
+
+        print("\nPER-MODEL METRICS SUMMARY")
+        print(metrics_df.to_string(index=False))
 
     acc_models = [item[0] for item in available if item[2] is not None]
     acc_values = [float(item[2]) for item in available if item[2] is not None]
@@ -567,7 +643,7 @@ def plot_final_evaluation_dashboard_section(namespace=None):
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(6 * ncols, 5 * nrows))
     axes = np.array(axes).reshape(-1)
 
-    for idx, (model_name, cm_value, _) in enumerate(available):
+    for idx, (model_name, cm_value, _, _) in enumerate(available):
         ax = axes[idx]
         row_sums = cm_value.sum(axis=1, keepdims=True)
         row_sums = np.where(row_sums == 0, 1, row_sums)
