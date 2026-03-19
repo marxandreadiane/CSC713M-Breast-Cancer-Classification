@@ -520,18 +520,18 @@ def plot_final_evaluation_dashboard_section(namespace=None):
         namespace = {}
 
     results_catalog = [
-        ("Random Forest", "cm", "test_accuracy"),
-        ("MobileNetV2 (Basic)", "cm_mobilenet", "accuracy"),
-        ("Improved MobileNetV2", "cm_improved", "improved_accuracy"),
-        ("Final MobileNetV2", "cm_final", "final_accuracy"),
-        ("ResNet50 (Basic)", "cm_resnet", "resnet_accuracy"),
-        ("ResNet50 (V2, Improved)", "cm_resnet_finetuned", "resnet_finetuned_accuracy"),
+        ("Random Forest", ["cm"], ["test_accuracy"]),
+        ("MobileNetV2 (Basic)", ["cm_mobilenet"], ["accuracy"]),
+        ("MobileNetV2 2.0", ["cm_improved_mobilenet", "cm_improved"], ["improved_accuracy"]),
+        ("MobileNetV2 3.0", ["cm_final_mobilenet", "cm_final"], ["final_accuracy"]),
+        ("ResNet50 (Basic)", ["cm_resnet"], ["resnet_accuracy"]),
+        ("ResNet50 2.0", ["cm_resnet_finetuned"], ["resnet_finetuned_accuracy"]),
     ]
 
     available = []
-    for model_name, cm_var, acc_var in results_catalog:
-        cm_value = namespace.get(cm_var)
-        acc_value = namespace.get(acc_var)
+    for model_name, cm_vars, acc_vars in results_catalog:
+        cm_value = next((namespace.get(var_name) for var_name in cm_vars if namespace.get(var_name) is not None), None)
+        acc_value = next((namespace.get(var_name) for var_name in acc_vars if namespace.get(var_name) is not None), None)
         if cm_value is not None and hasattr(cm_value, "shape") and np.array(cm_value).ndim == 2:
             available.append((model_name, np.array(cm_value), acc_value))
 
