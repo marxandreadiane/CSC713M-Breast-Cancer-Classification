@@ -81,23 +81,3 @@ def build_resnet50_basic(input_shape, num_classes):
     model = Model(inputs=base_model.input, outputs=output_layer)
     return base_model, model
 
-
-def build_simple_cnn(input_shape=(128, 128, 1), num_classes=3, dropout_rate=0.3):
-    model = Sequential(
-        [
-            Conv2D(32, (3, 3), activation="relu", padding="same", input_shape=input_shape),
-            MaxPooling2D(pool_size=(2, 2)),
-            Dropout(dropout_rate),
-            Conv2D(64, (3, 3), activation="relu", padding="same"),
-            MaxPooling2D(pool_size=(2, 2)),
-            Dropout(dropout_rate),
-            Conv2D(128, (3, 3), activation="relu", padding="same"),
-            MaxPooling2D(pool_size=(2, 2)),
-            Dropout(dropout_rate),
-            Flatten(),
-            Dense(128, activation="relu"),
-            Dropout(dropout_rate),
-            Dense(num_classes, activation="softmax"),
-        ]
-    )
-    return model

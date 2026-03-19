@@ -105,19 +105,47 @@ def augment_target_class(
     for idx in tqdm(target_indices):
         img = X_train[idx]
         img_2d = img[:, :, 0] if img.shape[-1] == 1 else img
+        rotate_count = 0
 
         augmented_images.append(img)
         augmented_labels.append(y_train[idx])
 
         for aug_idx in range(num_augs):
             transform_name = active_transforms[aug_idx % len(active_transforms)]
-            if transform_name == "flip":
+            if transform_name in ("flip", "flip_h"):
                 transformed = cv2.flip(img_2d, 1)
-            elif transform_name == "rotate":
+            elif transform_name == "flip_v":
+                transformed = cv2.flip(img_2d, 0)
+            elif transform_name == "flip_both":
+                transformed = cv2.flip(img_2d, -1)
+            elif transform_name in ("rotate", "rotate_alt"):
                 h, w = img_2d.shape[:2]
                 center = (w // 2, h // 2)
-                signed_angle = rotation_angle if aug_idx % 2 == 0 else -rotation_angle
+                signed_angle = rotation_angle if rotate_count % 2 == 0 else -rotation_angle
+                rotate_count += 1
                 rotation_matrix = cv2.getRotationMatrix2D(center, signed_angle, 1.0)
+                transformed = cv2.warpAffine(
+                    img_2d,
+                    rotation_matrix,
+                    (w, h),
+                    flags=cv2.INTER_LINEAR,
+                    borderMode=cv2.BORDER_REFLECT,
+                )
+            elif transform_name in ("rotate_pos", "rotate_plus"):
+                h, w = img_2d.shape[:2]
+                center = (w // 2, h // 2)
+                rotation_matrix = cv2.getRotationMatrix2D(center, rotation_angle, 1.0)
+                transformed = cv2.warpAffine(
+                    img_2d,
+                    rotation_matrix,
+                    (w, h),
+                    flags=cv2.INTER_LINEAR,
+                    borderMode=cv2.BORDER_REFLECT,
+                )
+            elif transform_name in ("rotate_neg", "rotate_minus"):
+                h, w = img_2d.shape[:2]
+                center = (w // 2, h // 2)
+                rotation_matrix = cv2.getRotationMatrix2D(center, -rotation_angle, 1.0)
                 transformed = cv2.warpAffine(
                     img_2d,
                     rotation_matrix,

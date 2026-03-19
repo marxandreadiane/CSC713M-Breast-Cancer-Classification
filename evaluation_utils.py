@@ -176,9 +176,9 @@ def _get_default_comparison_metrics_df():
                 "ResNet50",
                 "ResNet50 2.0",
             ],
-            "Test Accuracy": [0.6667, 0.7143, 0.7619, 0.7687, 0.5034, 0.6395],
+            "Test Accuracy": [0.6667, 0.7143, 0.7619, 0.8095, 0.5034, 0.6395],
             "Malignant Recall": [0.6667, 0.7667, 0.7333, 0.7333, 0.5667, 0.6333],
-            "Malignant Precision": [0.5263, 0.6216, 0.6286, 0.6286, 0.3696, 0.5938],
+            "Malignant Precision": [0.5263, 0.6216, 0.6286, 0.6875, 0.3696, 0.5938],
         }
     )
 
@@ -208,7 +208,7 @@ def plot_data_centric_section(namespace=None, false_normals=None, versions=None)
     if versions is None:
         versions = ["MobileNetV2", "MobileNetV2 2.0", "MobileNetV2 3.0"]
     if false_normals is None:
-        false_normals = [16, 15, 13]
+        false_normals = [16, 15, 9]
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 
@@ -296,7 +296,274 @@ def plot_random_forest_feature_importance_section(namespace=None, top_k=30):
     plt.show()
 
 
-def plot_training_loss_section(namespace=None):
+def plot_false_normal_reduction(versions=None, false_normals=None):
+    if versions is None:
+        versions = ["MobileNetV2", "MobileNetV2 2.0", "MobileNetV2 3.0"]
+    if false_normals is None:
+        false_normals = [16, 15, 9]
+
+    plt.figure(figsize=(7, 4.5))
+    plt.plot(versions, false_normals, marker="o", linewidth=2.5, color="#d62728")
+    plt.title("False Normal Reduction", fontsize=13, fontweight="bold")
+    plt.xlabel("Model Version")
+    plt.ylabel("False Normal Count")
+    plt.grid(alpha=0.25)
+    for i, value in enumerate(false_normals):
+        plt.text(i, value + 0.15, str(value), ha="center", fontsize=9)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_random_forest_pixel_importance_map(namespace=None, top_k=30):
+    if namespace is None:
+        namespace = {}
+
+    rf_candidates = ["rf_model", "random_forest_model", "best_rf_model", "random_forest"]
+    rf_model_obj = next((namespace[name] for name in rf_candidates if name in namespace), None)
+
+    if rf_model_obj is None or not hasattr(rf_model_obj, "feature_importances_"):
+        print("Random Forest model with feature_importances_ not found. Run RF training/evaluation cells first.")
+        return
+
+    feature_importances = np.array(rf_model_obj.feature_importances_)
+    grid_size = int(np.sqrt(feature_importances.size))
+
+    if grid_size * grid_size == feature_importances.size:
+        importance_map = feature_importances.reshape(grid_size, grid_size)
+        plt.figure(figsize=(6, 6))
+        sns.heatmap(importance_map, cmap="inferno", cbar=True)
+        plt.title("Random Forest Pixel-Importance Map", fontsize=13, fontweight="bold")
+        plt.axis("off")
+        plt.tight_layout()
+        plt.show()
+        return
+
+    top_k = min(top_k, feature_importances.size)
+    top_indices = np.argsort(feature_importances)[-top_k:][::-1]
+    plt.figure(figsize=(10, 4.5))
+    sns.barplot(x=np.arange(top_k), y=feature_importances[top_indices], palette="mako")
+    plt.title("Top Random Forest Pixel Importances", fontsize=13, fontweight="bold")
+    plt.xlabel("Ranked Pixel Feature")
+    plt.ylabel("Importance")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_random_forest_benign_misclassification_breakdown(namespace=None):
+    if namespace is None:
+        namespace = {}
+
+    cm_value = namespace.get("cm")
+    label_encoder = namespace.get("label_encoder")
+
+    if cm_value is None:
+        print("Confusion matrix `cm` not found. Run RF evaluation cells first.")
+        return
+    if label_encoder is None or not hasattr(label_encoder, "classes_"):
+        print("`label_encoder` not found. Run preprocessing/encoding cells first.")
+        return
+
+    classes = list(label_encoder.classes_)
+    if "benign" not in classes:
+        print("Class 'benign' not found in label encoder classes.")
+        return
+
+    rf_cm = np.array(cm_value)
+    benign_idx = classes.index("benign")
+    benign_row = rf_cm[benign_idx]
+
+    benign_total = int(benign_row.sum())
+    benign_correct = int(benign_row[benign_idx])
+    benign_misclassified = benign_total - benign_correct
+
+    print(f"Benign total test samples: {benign_total}")
+    print(f"Benign correctly classified: {benign_correct}")
+    print(f"Benign misclassified: {benign_misclassified}")
+
+    mis_labels = []
+    mis_counts = []
+    for j, cls in enumerate(classes):
+        if j != benign_idx:
+            mis_labels.append(cls)
+            mis_counts.append(int(benign_row[j]))
+
+    plt.figure(figsize=(6, 4))
+    sns.barplot(x=mis_labels, y=mis_counts, palette="Set2")
+    plt.title("RF Benign Misclassification Breakdown", fontsize=12, fontweight="bold")
+    plt.xlabel("Predicted Class")
+    plt.ylabel("Count")
+    for i, v in enumerate(mis_counts):
+        plt.text(i, v + 0.05, str(v), ha="center", fontsize=9)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_resolution_impact_with_samples(
+    namespace=None,
+    sample_count=4,
+    resolution_df=None,
+    random_state=22,
+):
+    if namespace is None:
+        namespace = {}
+
+    if resolution_df is None:
+        resolution_df = pd.DataFrame(
+            {
+                "Model": ["MobileNetV2 2.0", "MobileNetV2 3.0"],
+                "Resolution": ["128x128", "224x224"],
+                "Pixels": [128 * 128, 224 * 224],
+                "Test Accuracy": [76.19, 80.95],
+                "False Normals": [15, 9],
+            }
+        )
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8))
+
+    sns.barplot(data=resolution_df, x="Resolution", y="Test Accuracy", hue="Model", palette="Set2", ax=axes[0])
+    axes[0].set_title("Accuracy by Input Resolution", fontweight="bold")
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].set_xlabel("Resolution")
+
+    sns.barplot(data=resolution_df, x="Resolution", y="False Normals", hue="Model", palette="Set2", ax=axes[1])
+    axes[1].set_title("False Normals by Resolution", fontweight="bold")
+    axes[1].set_ylabel("Count")
+    axes[1].set_xlabel("Resolution")
+
+    sns.barplot(data=resolution_df, x="Resolution", y="Pixels", palette="flare", ax=axes[2])
+    axes[2].set_title("Input Feature Space", fontweight="bold")
+    axes[2].set_ylabel("Pixels per Image")
+    axes[2].set_xlabel("Resolution")
+    for i, p in enumerate(resolution_df["Pixels"]):
+        axes[2].text(i, p + 1000, f"{p:,}", ha="center", fontsize=9)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    axes[0].legend(handles, labels, title="Model", loc="best")
+    axes[1].legend([], [], frameon=False)
+
+    plt.suptitle("Resolution Impact: 128x128 vs 224x224", fontsize=14, fontweight="bold", y=1.03)
+    plt.tight_layout()
+    plt.show()
+
+    print(f"Feature-space scale-up from 128x128 to 224x224: {(224 * 224) / (128 * 128):.2f}x")
+
+    x_128 = namespace.get("X_test_rgb")
+    x_224 = namespace.get("X_test_rgb_final224")
+    y_test = namespace.get("y_test")
+    label_encoder = namespace.get("label_encoder")
+
+    if x_128 is None or x_224 is None:
+        print("Sample visualization skipped: `X_test_rgb` and/or `X_test_rgb_final224` not found.")
+        return
+
+    x_128 = np.array(x_128)
+    x_224 = np.array(x_224)
+    n = min(len(x_128), len(x_224))
+    if n == 0:
+        print("Sample visualization skipped: empty test arrays.")
+        return
+
+    sample_count = max(1, min(sample_count, n))
+    rng = np.random.default_rng(random_state)
+    sample_indices = rng.choice(n, size=sample_count, replace=False)
+
+    fig, axes = plt.subplots(sample_count, 2, figsize=(8, 3 * sample_count))
+    if sample_count == 1:
+        axes = np.array([axes])
+
+    class_names = None
+    if label_encoder is not None and hasattr(label_encoder, "classes_"):
+        class_names = list(label_encoder.classes_)
+
+    for row_idx, sample_idx in enumerate(sample_indices):
+        img_128 = x_128[sample_idx]
+        img_224 = x_224[sample_idx]
+
+        img_128 = np.clip(img_128, 0.0, 1.0)
+        img_224 = np.clip(img_224, 0.0, 1.0)
+
+        axes[row_idx, 0].imshow(img_128)
+        axes[row_idx, 0].set_title("128x128", fontsize=10)
+        axes[row_idx, 0].axis("off")
+
+        axes[row_idx, 1].imshow(img_224)
+        axes[row_idx, 1].set_title("224x224", fontsize=10)
+        axes[row_idx, 1].axis("off")
+
+        if y_test is not None and class_names is not None and sample_idx < len(y_test):
+            label_idx = int(y_test[sample_idx])
+            if 0 <= label_idx < len(class_names):
+                axes[row_idx, 0].set_ylabel(class_names[label_idx], fontsize=10)
+
+    plt.suptitle("Actual Test Samples: 128x128 vs 224x224", fontsize=13, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_class_imbalance_progress(namespace=None):
+    if namespace is None:
+        namespace = {}
+
+    y_train = namespace.get("y_train")
+    y_train_augmented = namespace.get("y_train_augmented")
+    final_y_train_augmented = namespace.get("final_y_train_augmented")
+    label_encoder = namespace.get("label_encoder")
+
+    if y_train is None:
+        print("`y_train` not found. Run data split cells first.")
+        return
+
+    y_train = np.array(y_train).astype(int)
+    y_train_augmented = np.array(y_train_augmented).astype(int) if y_train_augmented is not None else None
+    final_y_train_augmented = (
+        np.array(final_y_train_augmented).astype(int) if final_y_train_augmented is not None else None
+    )
+
+    n_classes = int(np.max(y_train)) + 1
+    if y_train_augmented is not None:
+        n_classes = max(n_classes, int(np.max(y_train_augmented)) + 1)
+    if final_y_train_augmented is not None:
+        n_classes = max(n_classes, int(np.max(final_y_train_augmented)) + 1)
+
+    class_names = [f"Class {i}" for i in range(n_classes)]
+    if label_encoder is not None and hasattr(label_encoder, "classes_"):
+        classes = list(label_encoder.classes_)
+        if len(classes) == n_classes:
+            class_names = classes
+
+    stage_labels = ["No Augmentation", "Base Augmentation"]
+    stage_counts = [np.bincount(y_train, minlength=n_classes), np.bincount(y_train_augmented, minlength=n_classes)]
+
+    if final_y_train_augmented is not None:
+        stage_labels.append("Final Augmentation")
+        stage_counts.append(np.bincount(final_y_train_augmented, minlength=n_classes))
+
+    counts_df = pd.DataFrame(stage_counts, index=stage_labels, columns=class_names)
+    pct_df = counts_df.div(counts_df.sum(axis=1), axis=0) * 100
+
+    print("\nCLASS COUNTS BY STAGE")
+    print(counts_df.to_string())
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    counts_df.plot(kind="bar", ax=axes[0], colormap="Set2")
+    axes[0].set_title("Class Counts Across Augmentation Stages", fontweight="bold")
+    axes[0].set_xlabel("Training Stage")
+    axes[0].set_ylabel("Sample Count")
+    axes[0].tick_params(axis="x", rotation=12)
+    axes[0].legend(title="Class", bbox_to_anchor=(1.02, 1), loc="upper left")
+
+    sns.heatmap(pct_df, annot=True, fmt=".1f", cmap="YlGnBu", ax=axes[1])
+    axes[1].set_title("Class Percentage per Stage (%)", fontweight="bold")
+    axes[1].set_xlabel("Class")
+    axes[1].set_ylabel("Training Stage")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_training_loss_section(namespace=None, model_names=None):
     if namespace is None:
         namespace = {}
 
@@ -308,6 +575,10 @@ def plot_training_loss_section(namespace=None):
         ("ResNet50 2.0", "resnet_finetune_history"),
     ]
     available_histories = [(name, namespace[var]) for name, var in history_candidates if var in namespace]
+
+    if model_names is not None:
+        selected_names = set(model_names)
+        available_histories = [item for item in available_histories if item[0] in selected_names]
 
     if not available_histories:
         print("No training history objects found. Run the training cells first.")
@@ -337,26 +608,30 @@ def plot_training_loss_section(namespace=None):
     plt.show()
 
 
-def plot_confusion_matrices_section(namespace=None, normalize=True):
+def plot_confusion_matrices_section(namespace=None, normalize=True, model_names=None):
     if namespace is None:
         namespace = {}
 
     cm_candidates = [
-        ("Random Forest", "cm"),
-        ("MobileNetV2", "cm_mobilenet"),
-        ("MobileNetV2 2.0", "cm_improved"),
-        ("MobileNetV2 3.0", "cm_final"),
-        ("ResNet50", "cm_resnet"),
-        ("ResNet50 2.0", "cm_resnet_finetuned"),
+        ("Random Forest", ["cm"]),
+        ("MobileNetV2", ["cm_mobilenet"]),
+        ("MobileNetV2 2.0", ["cm_improved_mobilenet", "cm_improved"]),
+        ("MobileNetV2 3.0", ["cm_final_mobilenet", "cm_final"]),
+        ("ResNet50", ["cm_resnet"]),
+        ("ResNet50 2.0", ["cm_resnet_finetuned"]),
     ]
 
     available_cms = []
-    for model_name, cm_var in cm_candidates:
-        cm_value = namespace.get(cm_var)
+    for model_name, cm_vars in cm_candidates:
+        cm_value = next((namespace.get(var_name) for var_name in cm_vars if namespace.get(var_name) is not None), None)
         if cm_value is not None:
             cm_array = np.array(cm_value)
             if cm_array.ndim == 2:
                 available_cms.append((model_name, cm_array))
+
+    if model_names is not None:
+        selected_names = set(model_names)
+        available_cms = [item for item in available_cms if item[0] in selected_names]
 
     if not available_cms:
         print("No confusion matrices found. Run model evaluation cells first.")
@@ -645,23 +920,17 @@ def plot_final_evaluation_dashboard_section(namespace=None):
 
     for idx, (model_name, cm_value, _, _) in enumerate(available):
         ax = axes[idx]
-        row_sums = cm_value.sum(axis=1, keepdims=True)
-        row_sums = np.where(row_sums == 0, 1, row_sums)
-        cm_norm = cm_value / row_sums
-
         sns.heatmap(
-            cm_norm,
+            cm_value,
             ax=ax,
             cmap="Blues",
             annot=True,
-            fmt=".2f",
-            vmin=0,
-            vmax=1,
+            fmt="d",
             xticklabels=label_names,
             yticklabels=label_names,
             cbar=False,
         )
-        ax.set_title(f"{model_name}\nNormalized Confusion Matrix", fontsize=11, fontweight="bold")
+        ax.set_title(f"{model_name}\nConfusion Matrix (Counts)", fontsize=11, fontweight="bold")
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
 
