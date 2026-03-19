@@ -10,7 +10,7 @@ def preprocess_images(df_all_images, target_size=(128, 128), clip_limit=2.0, til
     labels = []
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
 
-    print(f"Loading and preprocessing {len(df_all_images)} images...")
+    print(f"Preprocessing {len(df_all_images)} images...")
 
     for _, row in tqdm(df_all_images.iterrows(), total=len(df_all_images)):
         try:

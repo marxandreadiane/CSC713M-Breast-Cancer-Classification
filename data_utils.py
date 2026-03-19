@@ -51,13 +51,12 @@ def get_label_from_mask(mask_path):
 
 def load_busi_dataset(dataset_root):
     image_data = []
-    mask_data = []
 
     for root, _, files in Path(dataset_root).walk():
         root_path = Path(root)
 
         for filename in files:
-            if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif")):
+            if not filename.lower().endswith((".png")):
                 continue
 
             file_path = root_path / filename
