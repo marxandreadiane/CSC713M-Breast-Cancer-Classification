@@ -24,6 +24,7 @@ def get_dataset_paths(start_dir=None):
 
 
 def get_label_from_mask(mask_path):
+    # Infer BUS-UCLM class from dominant mask color (red=malignant, green=benign, else normal).
     try:
         mask = Image.open(mask_path).convert("RGB")
         mask_array = np.array(mask)
@@ -50,6 +51,7 @@ def get_label_from_mask(mask_path):
 
 
 def load_busi_dataset(dataset_root):
+    # Parse BUSI image paths and derive labels from folder names, excluding mask files.
     image_data = []
 
     for root, _, files in Path(dataset_root).walk():
@@ -80,6 +82,7 @@ def load_busi_dataset(dataset_root):
 
 
 def load_bus_uclm_dataset(dataset_root):
+    # Pair each BUS-UCLM image with its mask and derive labels from mask color coding.
     images_dir = Path(dataset_root) / "images"
     masks_dir = Path(dataset_root) / "masks"
 
@@ -98,6 +101,7 @@ def load_bus_uclm_dataset(dataset_root):
 
 
 def merge_image_and_mask_datasets(df_busi_images, df_bus_uclm_images):
+    # Merge both sources and drop entries without a resolved class label.
     df_all_images = pd.concat([df_busi_images, df_bus_uclm_images], ignore_index=True)
     df_all_images = df_all_images[df_all_images["label"].notna()]
     return df_all_images

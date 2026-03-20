@@ -99,72 +99,6 @@ def plot_training_history(history, title):
     plt.show()
 
 
-def compare_model_accuracies(model_names, accuracies):
-    comparison_df = pd.DataFrame(
-        {
-            "Model": model_names,
-            "Test Accuracy": [f"{accuracy * 100:.2f}%" for accuracy in accuracies],
-        }
-    )
-
-    print(f"\n{'=' * 60}")
-    print("MODEL PERFORMANCE COMPARISON (Test Set)")
-    print(f"{'=' * 60}")
-    print(comparison_df.to_string(index=False))
-    print(f"{'=' * 60}")
-
-    plt.figure(figsize=(12, 7))
-    sns.barplot(x=model_names, y=accuracies, palette="viridis")
-    plt.title("Test Accuracy Comparison Across Models", fontsize=16, fontweight="bold")
-    plt.xlabel("Model", fontsize=12)
-    plt.ylabel("Test Accuracy", fontsize=12)
-    plt.ylim(0, 1)
-    for index, value in enumerate(accuracies):
-        plt.text(index, value + 0.02, f"{value * 100:.2f}%", color="black", ha="center")
-    plt.xticks(rotation=15)
-    plt.tight_layout()
-    plt.show()
-
-    return comparison_df
-
-
-def plot_side_by_side_confusion_matrices(cm_left, cm_right, labels, left_title, right_title):
-    print("Generating side-by-side Confusion Matrices for comparison...")
-
-    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-    disp_left = ConfusionMatrixDisplay(confusion_matrix=cm_left, display_labels=labels)
-    disp_left.plot(ax=axes[0], cmap="Greens", values_format="d")
-    axes[0].set_title(left_title, fontsize=14, fontweight="bold", pad=20)
-    axes[0].set_xlabel("Predicted Label", fontsize=12)
-    axes[0].set_ylabel("True Label", fontsize=12)
-
-    disp_right = ConfusionMatrixDisplay(confusion_matrix=cm_right, display_labels=labels)
-    disp_right.plot(ax=axes[1], cmap="Blues", values_format="d")
-    axes[1].set_title(right_title, fontsize=14, fontweight="bold", pad=20)
-    axes[1].set_xlabel("Predicted Label", fontsize=12)
-    axes[1].set_ylabel("True Label", fontsize=12)
-
-    plt.suptitle("Comparison of Models on Test Set", fontsize=16, fontweight="bold", y=1.02)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
-
-
-def plot_all_confusion_matrices(confusion_matrices, labels, titles, cmaps):
-    fig, axes = plt.subplots(2, 2, figsize=(18, 16))
-    axes = axes.flatten()
-
-    for axis, cm, title, cmap in zip(axes, confusion_matrices, titles, cmaps):
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-        disp.plot(ax=axis, cmap=cmap, values_format="d")
-        axis.set_title(title, fontsize=14, fontweight="bold", pad=10)
-        axis.set_xlabel("Predicted Label", fontsize=12)
-        axis.set_ylabel("True Label", fontsize=12)
-
-    plt.suptitle("Confusion Matrices Comparison on Test Set", fontsize=18, fontweight="bold", y=1.02)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.98])
-    plt.show()
-
-
 def _get_default_comparison_metrics_df():
     return pd.DataFrame(
         {
@@ -202,98 +136,14 @@ def plot_comparative_metrics_section(metrics_df=None):
 
 
 def plot_data_centric_section(namespace=None, false_normals=None, versions=None):
-    if namespace is None:
-        namespace = {}
-
-    if versions is None:
-        versions = ["MobileNetV2", "MobileNetV2 2.0", "MobileNetV2 3.0"]
-    if false_normals is None:
-        false_normals = [16, 15, 9]
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    axes[0].plot(versions, false_normals, marker="o", linewidth=2.5, color="#d62728")
-    axes[0].set_title("False Normal Reduction", fontsize=12, fontweight="bold")
-    axes[0].set_xlabel("Model Version")
-    axes[0].set_ylabel("False Normal Count")
-    axes[0].grid(alpha=0.25)
-    for i, value in enumerate(false_normals):
-        axes[0].text(i, value + 0.15, str(value), ha="center", fontsize=9)
-
-    y_train = namespace.get("y_train")
-    y_train_augmented = namespace.get("y_train_augmented")
-    label_encoder = namespace.get("label_encoder")
-
-    if y_train is not None and y_train_augmented is not None:
-        raw_counts = np.bincount(np.array(y_train).astype(int))
-        aug_counts = np.bincount(np.array(y_train_augmented).astype(int))
-        n_classes = max(len(raw_counts), len(aug_counts))
-        raw_counts = np.pad(raw_counts, (0, n_classes - len(raw_counts)))
-        aug_counts = np.pad(aug_counts, (0, n_classes - len(aug_counts)))
-
-        x = np.arange(n_classes)
-        width = 0.38
-        if label_encoder is not None and hasattr(label_encoder, "classes_"):
-            class_names = list(label_encoder.classes_)
-        else:
-            class_names = [f"Class {i}" for i in x]
-
-        axes[1].bar(x - width / 2, raw_counts, width=width, label="Before Aug", color="#4c72b0")
-        axes[1].bar(x + width / 2, aug_counts, width=width, label="After Aug", color="#55a868")
-        axes[1].set_xticks(x)
-        axes[1].set_xticklabels(class_names, rotation=20, ha="right")
-        axes[1].set_title("Class Distribution Shift", fontsize=12, fontweight="bold")
-        axes[1].set_ylabel("Sample Count")
-        axes[1].legend()
-    else:
-        axes[1].axis("off")
-        axes[1].text(
-            0.5,
-            0.5,
-            "Class distribution plot unavailable\n(run data preparation cells first)",
-            ha="center",
-            va="center",
-            fontsize=10,
-        )
-
-    plt.suptitle("Data-Centric Strategies: Quantitative Impact", fontsize=14, fontweight="bold", y=1.03)
-    plt.tight_layout()
-    plt.show()
+    # Backward-compatible wrapper used by the notebook import block.
+    plot_false_normal_reduction(versions=versions, false_normals=false_normals)
+    plot_class_imbalance_progress(namespace=namespace)
 
 
 def plot_random_forest_feature_importance_section(namespace=None, top_k=30):
-    if namespace is None:
-        namespace = {}
-
-    rf_candidates = ["rf_model", "random_forest_model", "best_rf_model", "random_forest"]
-    rf_model_obj = next((namespace[name] for name in rf_candidates if name in namespace), None)
-
-    if rf_model_obj is None or not hasattr(rf_model_obj, "feature_importances_"):
-        print("Random Forest model with feature_importances_ not found. Run RF training/evaluation cells first.")
-        return
-
-    feature_importances = np.array(rf_model_obj.feature_importances_)
-    grid_size = int(np.sqrt(feature_importances.size))
-
-    if grid_size * grid_size != feature_importances.size:
-        top_k = min(top_k, feature_importances.size)
-        top_indices = np.argsort(feature_importances)[-top_k:][::-1]
-        plt.figure(figsize=(10, 5))
-        sns.barplot(x=np.arange(top_k), y=feature_importances[top_indices], palette="mako")
-        plt.title("Top Random Forest Pixel Importances", fontsize=13, fontweight="bold")
-        plt.xlabel("Ranked Feature Index")
-        plt.ylabel("Importance")
-        plt.tight_layout()
-        plt.show()
-        return
-
-    importance_map = feature_importances.reshape(grid_size, grid_size)
-    plt.figure(figsize=(6, 6))
-    sns.heatmap(importance_map, cmap="inferno", cbar=True)
-    plt.title("Random Forest Feature-Importance Map", fontsize=13, fontweight="bold")
-    plt.axis("off")
-    plt.tight_layout()
-    plt.show()
+    # Backward-compatible wrapper used by the notebook import block.
+    plot_random_forest_pixel_importance_map(namespace=namespace, top_k=top_k)
 
 
 def plot_false_normal_reduction(versions=None, false_normals=None):
@@ -395,108 +245,6 @@ def plot_random_forest_benign_misclassification_breakdown(namespace=None):
     plt.ylabel("Count")
     for i, v in enumerate(mis_counts):
         plt.text(i, v + 0.05, str(v), ha="center", fontsize=9)
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_resolution_impact_with_samples(
-    namespace=None,
-    sample_count=4,
-    resolution_df=None,
-    random_state=22,
-):
-    if namespace is None:
-        namespace = {}
-
-    if resolution_df is None:
-        resolution_df = pd.DataFrame(
-            {
-                "Model": ["MobileNetV2 2.0", "MobileNetV2 3.0"],
-                "Resolution": ["128x128", "224x224"],
-                "Pixels": [128 * 128, 224 * 224],
-                "Test Accuracy": [76.19, 80.95],
-                "False Normals": [15, 9],
-            }
-        )
-
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8))
-
-    sns.barplot(data=resolution_df, x="Resolution", y="Test Accuracy", hue="Model", palette="Set2", ax=axes[0])
-    axes[0].set_title("Accuracy by Input Resolution", fontweight="bold")
-    axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_xlabel("Resolution")
-
-    sns.barplot(data=resolution_df, x="Resolution", y="False Normals", hue="Model", palette="Set2", ax=axes[1])
-    axes[1].set_title("False Normals by Resolution", fontweight="bold")
-    axes[1].set_ylabel("Count")
-    axes[1].set_xlabel("Resolution")
-
-    sns.barplot(data=resolution_df, x="Resolution", y="Pixels", palette="flare", ax=axes[2])
-    axes[2].set_title("Input Feature Space", fontweight="bold")
-    axes[2].set_ylabel("Pixels per Image")
-    axes[2].set_xlabel("Resolution")
-    for i, p in enumerate(resolution_df["Pixels"]):
-        axes[2].text(i, p + 1000, f"{p:,}", ha="center", fontsize=9)
-
-    handles, labels = axes[0].get_legend_handles_labels()
-    axes[0].legend(handles, labels, title="Model", loc="best")
-    axes[1].legend([], [], frameon=False)
-
-    plt.suptitle("Resolution Impact: 128x128 vs 224x224", fontsize=14, fontweight="bold", y=1.03)
-    plt.tight_layout()
-    plt.show()
-
-    print(f"Feature-space scale-up from 128x128 to 224x224: {(224 * 224) / (128 * 128):.2f}x")
-
-    x_128 = namespace.get("X_test_rgb")
-    x_224 = namespace.get("X_test_rgb_final224")
-    y_test = namespace.get("y_test")
-    label_encoder = namespace.get("label_encoder")
-
-    if x_128 is None or x_224 is None:
-        print("Sample visualization skipped: `X_test_rgb` and/or `X_test_rgb_final224` not found.")
-        return
-
-    x_128 = np.array(x_128)
-    x_224 = np.array(x_224)
-    n = min(len(x_128), len(x_224))
-    if n == 0:
-        print("Sample visualization skipped: empty test arrays.")
-        return
-
-    sample_count = max(1, min(sample_count, n))
-    rng = np.random.default_rng(random_state)
-    sample_indices = rng.choice(n, size=sample_count, replace=False)
-
-    fig, axes = plt.subplots(sample_count, 2, figsize=(8, 3 * sample_count))
-    if sample_count == 1:
-        axes = np.array([axes])
-
-    class_names = None
-    if label_encoder is not None and hasattr(label_encoder, "classes_"):
-        class_names = list(label_encoder.classes_)
-
-    for row_idx, sample_idx in enumerate(sample_indices):
-        img_128 = x_128[sample_idx]
-        img_224 = x_224[sample_idx]
-
-        img_128 = np.clip(img_128, 0.0, 1.0)
-        img_224 = np.clip(img_224, 0.0, 1.0)
-
-        axes[row_idx, 0].imshow(img_128)
-        axes[row_idx, 0].set_title("128x128", fontsize=10)
-        axes[row_idx, 0].axis("off")
-
-        axes[row_idx, 1].imshow(img_224)
-        axes[row_idx, 1].set_title("224x224", fontsize=10)
-        axes[row_idx, 1].axis("off")
-
-        if y_test is not None and class_names is not None and sample_idx < len(y_test):
-            label_idx = int(y_test[sample_idx])
-            if 0 <= label_idx < len(class_names):
-                axes[row_idx, 0].set_ylabel(class_names[label_idx], fontsize=10)
-
-    plt.suptitle("Actual Test Samples: 128x128 vs 224x224", fontsize=13, fontweight="bold", y=1.02)
     plt.tight_layout()
     plt.show()
 

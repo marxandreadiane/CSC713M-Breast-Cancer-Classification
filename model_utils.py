@@ -1,15 +1,11 @@
 from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras.applications import MobileNetV2, ResNet50
-from tensorflow.keras import Sequential
 from tensorflow.keras.layers import (
     BatchNormalization,
-    Conv2D,
     Dense,
     Dropout,
-    Flatten,
     GaussianNoise,
     GlobalAveragePooling2D,
-    MaxPooling2D,
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
